@@ -164,3 +164,90 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* Range slider */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-bg-elevated);
+  outline: none;
+}
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+  transition: box-shadow 0.2s;
+}
+.range-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.6);
+}
+.range-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+}
+
+/* Light mode */
+.light {
+  --color-bg-primary: #F8FAFC;
+  --color-bg-card: #FFFFFF;
+  --color-bg-elevated: #F1F5F9;
+  --color-bg-input: #E2E8F0;
+  --color-bg-hover: #E2E8F0;
+
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-text-inverse: #F8FAFC;
+
+  --color-glass-bg: rgba(255, 255, 255, 0.8);
+  --color-glass-border: rgba(139, 92, 246, 0.15);
+  --color-glass-border-light: rgba(15, 23, 42, 0.08);
+
+  --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.1);
+  --shadow-glow-sm: 0 0 10px rgba(139, 92, 246, 0.08);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+.light html, .light body, html.light, body.light {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+/* Floating orbs background animation */
+@keyframes float-orb {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -20px) scale(1.1); }
+  50% { transform: translate(-15px, -40px) scale(0.95); }
+  75% { transform: translate(20px, -10px) scale(1.05); }
+}
+.animate-float-orb {
+  animation: float-orb 20s ease-in-out infinite;
+}
+.animate-float-orb-delay {
+  animation: float-orb 25s ease-in-out 5s infinite;
+}
+.animate-float-orb-delay-2 {
+  animation: float-orb 18s ease-in-out 10s infinite;
+}
+
+/* Streak flame animation */
+@keyframes flame-dance {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  25% { transform: scaleY(1.1) scaleX(0.95); }
+  50% { transform: scaleY(0.95) scaleX(1.05); }
+  75% { transform: scaleY(1.05) scaleX(0.98); }
+}
+.animate-flame {
+  animation: flame-dance 2s ease-in-out infinite;
+}

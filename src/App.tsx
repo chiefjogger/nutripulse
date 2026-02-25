@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { AppShell } from '@/components/layout/AppShell'
 import { RequireAuth } from '@/components/layout/RequireAuth'
+import { SplashScreen } from '@/components/features/SplashScreen'
 import Login from '@/routes/Login'
 import Onboarding from '@/routes/Onboarding'
 import Dashboard from '@/routes/Dashboard'
@@ -20,6 +21,7 @@ export default function App() {
   useAuth()
 
   return (
+    <SplashScreen>
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         {/* Public */}
@@ -44,5 +46,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
+    </SplashScreen>
   )
 }

@@ -15,6 +15,7 @@ export interface Profile {
   protein_target_g?: number | null
   carb_target_g?: number | null
   fat_target_g?: number | null
+  custom_tdee?: number | null
   onboarded: boolean
   created_at: string
   updated_at: string

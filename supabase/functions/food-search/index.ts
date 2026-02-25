@@ -74,14 +74,13 @@ Deno.serve(async (req) => {
 
     // Fetch from both APIs in parallel
     const [usdaRes, offRes] = await Promise.allSettled([
-      fetch('https://api.nal.usda.gov/fdc/v1/foods/search', {
+      fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query,
           dataType: ['Foundation', 'SR Legacy', 'Branded'],
           pageSize,
-          api_key: USDA_API_KEY,
         }),
       }).then((r) => r.json()),
 

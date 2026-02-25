@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, ArrowLeft, Check } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Check, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -22,11 +22,14 @@ import {
 
 const STEPS = ['welcome', 'body', 'goals', 'activity', 'review'] as const
 
+const RATE_STEPS = [-1.0, -0.75, -0.5, -0.35, -0.25, 0, 0.25, 0.35, 0.5, 0.75, 1.0]
+
 export default function Onboarding() {
   const navigate = useNavigate()
   const { user, setProfile } = useAuthStore()
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [manualTDEE, setManualTDEE] = useState(false)
 
   const [form, setForm] = useState({
     display_name: '',
@@ -37,12 +40,13 @@ export default function Onboarding() {
     goal_weight_kg: '',
     goal_rate: '0',
     activity_level: 'moderate' as ActivityLevel,
+    custom_tdee: '',
   })
 
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }))
 
-  function calculateTDEE() {
+  function calculateAutoTDEE() {
     const weight = parseFloat(form.current_weight_kg) || 70
     const height = parseFloat(form.height_cm) || 170
     const age = 25
@@ -50,8 +54,15 @@ export default function Onboarding() {
     return Math.round(bmr * ACTIVITY_MULTIPLIERS[form.activity_level])
   }
 
-  function calculateTargets() {
-    const tdee = calculateTDEE()
+  function getEffectiveTDEE() {
+    if (manualTDEE && form.custom_tdee) {
+      return parseFloat(form.custom_tdee) || calculateAutoTDEE()
+    }
+    return calculateAutoTDEE()
+  }
+
+  const calculatedTargets = useMemo(() => {
+    const tdee = getEffectiveTDEE()
     const rate = parseFloat(form.goal_rate) || 0
     const adjustment = (rate * 7700) / 7
     const calories = Math.round(tdee + adjustment)
@@ -59,13 +70,13 @@ export default function Onboarding() {
     const protein_g = Math.round(weight * 2.0)
     const fat_g = Math.round((calories * 0.27) / 9)
     const carbs_g = Math.round((calories - protein_g * 4 - fat_g * 9) / 4)
-    return { calories, protein_g, carbs_g, fat_g }
-  }
+    return { tdee, calories, protein_g, carbs_g, fat_g }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.current_weight_kg, form.height_cm, form.activity_level, form.goal_rate, form.custom_tdee, manualTDEE])
 
   async function handleComplete() {
     if (!user) return
     setSaving(true)
-    const targets = calculateTargets()
     const profileData = {
       display_name: form.display_name || 'User',
       height_cm: parseFloat(form.height_cm) || null,
@@ -75,10 +86,11 @@ export default function Onboarding() {
       goal_weight_kg: form.goal_weight_kg ? parseFloat(form.goal_weight_kg) : null,
       goal_rate: parseFloat(form.goal_rate) || 0,
       activity_level: form.activity_level,
-      calorie_target: targets.calories,
-      protein_target_g: targets.protein_g,
-      carb_target_g: targets.carbs_g,
-      fat_target_g: targets.fat_g,
+      calorie_target: calculatedTargets.calories,
+      protein_target_g: calculatedTargets.protein_g,
+      carb_target_g: calculatedTargets.carbs_g,
+      fat_target_g: calculatedTargets.fat_g,
+      custom_tdee: manualTDEE && form.custom_tdee ? parseFloat(form.custom_tdee) : null,
       onboarded: true,
     }
 
@@ -181,7 +193,12 @@ export default function Onboarding() {
                   {GOAL_TYPES.map((g) => (
                     <button
                       key={g}
-                      onClick={() => update('goal_type', g)}
+                      onClick={() => {
+                        update('goal_type', g)
+                        if (g === 'maintain') update('goal_rate', '0')
+                        else if (g === 'lose' && parseFloat(form.goal_rate) >= 0) update('goal_rate', '-0.5')
+                        else if (g === 'gain' && parseFloat(form.goal_rate) <= 0) update('goal_rate', '0.35')
+                      }}
                       className={cn(
                         'w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition-all duration-200',
                         form.goal_type === g
@@ -194,9 +211,57 @@ export default function Onboarding() {
                   ))}
                 </div>
                 {form.goal_type !== 'maintain' && (
-                  <div className="space-y-4">
+                  <div className="space-y-5">
                     <Input label="Goal Weight" placeholder="65" value={form.goal_weight_kg} onChange={(e) => update('goal_weight_kg', e.target.value)} type="number" suffix="kg" />
-                    <Input label={`Rate (kg/week, ${form.goal_type === 'lose' ? 'negative' : 'positive'})`} placeholder={form.goal_type === 'lose' ? '-0.5' : '0.3'} value={form.goal_rate} onChange={(e) => update('goal_rate', e.target.value)} type="number" suffix="kg/w" />
+
+                    {/* Rate slider */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-text-secondary">Weekly Rate</label>
+                        <span className={cn(
+                          'text-sm font-bold tabular-nums',
+                          parseFloat(form.goal_rate) < 0 ? 'text-accent' : parseFloat(form.goal_rate) > 0 ? 'text-success' : 'text-text-primary',
+                        )}>
+                          {parseFloat(form.goal_rate) > 0 ? '+' : ''}{form.goal_rate} kg/week
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="range"
+                          min={form.goal_type === 'lose' ? -1.0 : 0}
+                          max={form.goal_type === 'gain' ? 1.0 : 0}
+                          step={0.05}
+                          value={parseFloat(form.goal_rate) || 0}
+                          onChange={(e) => update('goal_rate', parseFloat(e.target.value).toFixed(2))}
+                          className="range-slider w-full"
+                        />
+                        <div className="flex justify-between text-[10px] text-text-muted mt-1 px-0.5">
+                          <span>{form.goal_type === 'lose' ? '-1.0' : '0'}</span>
+                          <span>{form.goal_type === 'lose' ? 'Aggressive' : 'Slow'}</span>
+                          <span>{form.goal_type === 'gain' ? '+1.0' : '0'}</span>
+                        </div>
+                      </div>
+                      {/* Quick picks */}
+                      <div className="flex gap-1.5 flex-wrap">
+                        {(form.goal_type === 'lose'
+                          ? RATE_STEPS.filter(r => r < 0)
+                          : RATE_STEPS.filter(r => r > 0)
+                        ).map((rate) => (
+                          <button
+                            key={rate}
+                            onClick={() => update('goal_rate', rate.toString())}
+                            className={cn(
+                              'px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
+                              parseFloat(form.goal_rate) === rate
+                                ? 'bg-accent/20 text-accent border border-accent/30'
+                                : 'bg-bg-elevated text-text-muted border border-transparent hover:bg-bg-hover',
+                            )}
+                          >
+                            {rate > 0 ? '+' : ''}{rate}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -212,15 +277,15 @@ export default function Onboarding() {
                   {ACTIVITY_LEVELS.map((level) => (
                     <button
                       key={level}
-                      onClick={() => update('activity_level', level)}
+                      onClick={() => { update('activity_level', level); setManualTDEE(false) }}
                       className={cn(
                         'w-full rounded-xl px-4 py-3 text-left transition-all duration-200',
-                        form.activity_level === level
+                        form.activity_level === level && !manualTDEE
                           ? 'bg-accent/15 border border-accent/30 glow-accent'
                           : 'bg-bg-elevated border border-transparent hover:bg-bg-hover',
                       )}
                     >
-                      <div className={cn('text-sm font-medium', form.activity_level === level ? 'text-accent' : 'text-text-primary')}>
+                      <div className={cn('text-sm font-medium', form.activity_level === level && !manualTDEE ? 'text-accent' : 'text-text-primary')}>
                         {ACTIVITY_LABELS[level]}
                       </div>
                       <div className="text-xs text-text-muted mt-0.5">
@@ -228,6 +293,58 @@ export default function Onboarding() {
                       </div>
                     </button>
                   ))}
+                </div>
+
+                {/* Manual TDEE override */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-text-muted text-xs">
+                    <div className="flex-1 h-px bg-glass-border-light" />
+                    <span>or</span>
+                    <div className="flex-1 h-px bg-glass-border-light" />
+                  </div>
+
+                  <button
+                    onClick={() => setManualTDEE(!manualTDEE)}
+                    className={cn(
+                      'w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all duration-200',
+                      manualTDEE
+                        ? 'bg-accent/15 border border-accent/30'
+                        : 'bg-bg-elevated border border-transparent hover:bg-bg-hover',
+                    )}
+                  >
+                    <Zap size={18} className={manualTDEE ? 'text-accent' : 'text-text-muted'} />
+                    <div>
+                      <div className={cn('text-sm font-medium', manualTDEE ? 'text-accent' : 'text-text-primary')}>
+                        Set TDEE Manually
+                      </div>
+                      <div className="text-xs text-text-muted">
+                        {manualTDEE
+                          ? `Auto-calculated: ${calculateAutoTDEE()} kcal`
+                          : 'Know your daily expenditure? Enter it directly'}
+                      </div>
+                    </div>
+                  </button>
+
+                  <AnimatePresence>
+                    {manualTDEE && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <Input
+                          label="Daily Expenditure (TDEE)"
+                          placeholder={calculateAutoTDEE().toString()}
+                          value={form.custom_tdee}
+                          onChange={(e) => update('custom_tdee', e.target.value)}
+                          type="number"
+                          suffix="kcal"
+                          autoFocus
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             )}
@@ -241,31 +358,27 @@ export default function Onboarding() {
                 <GlassCard className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">TDEE</span>
-                    <span className="font-semibold text-text-primary">{calculateTDEE()} kcal</span>
+                    <span className="font-semibold text-text-primary">
+                      {calculatedTargets.tdee} kcal
+                      {manualTDEE && <span className="text-xs text-accent ml-1">(manual)</span>}
+                    </span>
                   </div>
-                  {(() => {
-                    const t = calculateTargets()
-                    return (
-                      <>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-calories">Calories</span>
-                          <span className="font-semibold">{t.calories} kcal</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-protein">Protein</span>
-                          <span className="font-semibold">{t.protein_g}g</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-carbs">Carbs</span>
-                          <span className="font-semibold">{t.carbs_g}g</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-fat">Fat</span>
-                          <span className="font-semibold">{t.fat_g}g</span>
-                        </div>
-                      </>
-                    )
-                  })()}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-calories">Calories</span>
+                    <span className="font-semibold">{calculatedTargets.calories} kcal</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-protein">Protein</span>
+                    <span className="font-semibold">{calculatedTargets.protein_g}g</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-carbs">Carbs</span>
+                    <span className="font-semibold">{calculatedTargets.carbs_g}g</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-fat">Fat</span>
+                    <span className="font-semibold">{calculatedTargets.fat_g}g</span>
+                  </div>
                 </GlassCard>
                 <p className="text-xs text-text-muted text-center">
                   These adapt automatically as you log food and check in weekly.

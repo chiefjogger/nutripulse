@@ -6,6 +6,14 @@ import { Toaster } from 'sonner'
 import App from './App'
 import './index.css'
 
+// Apply saved theme before render to avoid flash
+try {
+  const stored = JSON.parse(localStorage.getItem('nutripulse-ui') ?? '{}')
+  if (stored?.state?.theme === 'light') {
+    document.documentElement.classList.add('light')
+  }
+} catch { /* ignore */ }
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
