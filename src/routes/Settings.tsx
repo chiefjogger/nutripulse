@@ -35,18 +35,19 @@ export default function Settings() {
     toast.success('Signed out')
   }
 
-  async function saveTargets() {
+  async function saveTargets(overrides?: Partial<typeof targets>) {
     if (!user) return
     setSaving(true)
+    const t = overrides ? { ...targets, ...overrides } : targets
     const updateData: Record<string, unknown> = {
-      calorie_target: parseFloat(targets.calorie_target) || null,
-      protein_target_g: parseFloat(targets.protein_target_g) || null,
-      carb_target_g: parseFloat(targets.carb_target_g) || null,
-      fat_target_g: parseFloat(targets.fat_target_g) || null,
-      activity_level: targets.activity_level,
+      calorie_target: parseFloat(t.calorie_target) || null,
+      protein_target_g: parseFloat(t.protein_target_g) || null,
+      carb_target_g: parseFloat(t.carb_target_g) || null,
+      fat_target_g: parseFloat(t.fat_target_g) || null,
+      activity_level: t.activity_level,
     }
-    if (targets.custom_tdee) {
-      updateData.custom_tdee = parseFloat(targets.custom_tdee)
+    if (t.custom_tdee) {
+      updateData.custom_tdee = parseFloat(t.custom_tdee)
     } else {
       updateData.custom_tdee = null
     }
@@ -68,7 +69,7 @@ export default function Settings() {
     toast.success('Targets updated!')
   }
 
-  function recalculateFromTDEE() {
+  function recalculateAndSave() {
     const tdee = parseFloat(targets.custom_tdee) || calculateAutoTDEE()
     const rate = profile?.goal_rate ?? 0
     const adjustment = (rate * 7700) / 7
@@ -77,13 +78,14 @@ export default function Settings() {
     const protein = Math.round(weight * 2.0)
     const fat = Math.round((calories * 0.27) / 9)
     const carbs = Math.round((calories - protein * 4 - fat * 9) / 4)
-    setTargets(prev => ({
-      ...prev,
+    const newTargets = {
       calorie_target: calories.toString(),
       protein_target_g: protein.toString(),
       carb_target_g: carbs.toString(),
       fat_target_g: fat.toString(),
-    }))
+    }
+    setTargets(prev => ({ ...prev, ...newTargets }))
+    saveTargets({ ...targets, ...newTargets })
   }
 
   function calculateAutoTDEE() {
@@ -196,8 +198,8 @@ export default function Settings() {
               <Button variant="secondary" size="sm" onClick={() => setEditing(null)} className="flex-1">
                 Cancel
               </Button>
-              <Button size="sm" onClick={() => { recalculateFromTDEE(); setEditing('targets') }} className="flex-1">
-                Recalculate Macros
+              <Button size="sm" onClick={recalculateAndSave} isLoading={saving} icon={<Save size={14} />} className="flex-1">
+                Save & Recalculate
               </Button>
             </div>
           </div>

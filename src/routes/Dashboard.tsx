@@ -10,7 +10,7 @@ import { CalorieSparkline } from '@/components/features/CalorieSparkline'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
 import { MACRO_COLORS, MEAL_LABELS, type MealType } from '@/lib/constants'
-import { useDailyLog } from '@/hooks/useFoodLog'
+import { useDailyLog, useWeeklyStats } from '@/hooks/useFoodLog'
 import { getEffectiveMacros } from '@/types/food'
 import { cn } from '@/lib/utils'
 
@@ -56,17 +56,14 @@ export default function Dashboard() {
 
   const remaining = Math.max(0, targets.calories - totals.calories)
 
-  // Mock streak data (will use real data from food_log once populated)
-  const mockWeekData = [true, true, true, false, true, true, logEntries.length > 0]
-  const mockStreakDays = mockWeekData.filter(Boolean).length
-  const mockSparkline = Array.from({ length: 7 }, (_, i) => ({
-    date: `2026-02-${19 + i}`,
-    calories: Math.round(1800 + Math.random() * 600),
+  // Real weekly stats
+  const { data: weeklyStats } = useWeeklyStats(selectedDate)
+  const weekData = weeklyStats?.days.map(d => d.logged) ?? Array(7).fill(false)
+  const sparklineData = weeklyStats?.days.map(d => ({
+    date: d.date,
+    calories: d.calories,
     target: targets.calories,
-  }))
-  if (mockSparkline.length > 0) {
-    mockSparkline[mockSparkline.length - 1].calories = Math.round(totals.calories)
-  }
+  })) ?? []
 
   if (isLoading) {
     return (
@@ -142,13 +139,13 @@ export default function Dashboard() {
 
       {/* Streak */}
       <StreakCard
-        daysLogged={mockStreakDays + 12}
-        currentStreak={mockStreakDays}
-        weekData={mockWeekData}
+        daysLogged={weeklyStats?.totalDaysLogged ?? 0}
+        currentStreak={weeklyStats?.streak ?? 0}
+        weekData={weekData}
       />
 
       {/* Sparkline */}
-      <CalorieSparkline data={mockSparkline} />
+      <CalorieSparkline data={sparklineData} />
 
       {/* Meal Sections */}
       <div className="space-y-2">
