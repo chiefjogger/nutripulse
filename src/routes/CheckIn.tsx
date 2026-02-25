@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
 
 export default function CheckIn() {
-  const { user, profile, setProfile } = useAuthStore()
+  const { user, setProfile } = useAuthStore()
   const [weight, setWeight] = useState('')
   const [bodyFat, setBodyFat] = useState('')
   const [notes, setNotes] = useState('')
